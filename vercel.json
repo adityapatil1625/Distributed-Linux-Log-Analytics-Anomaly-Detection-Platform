@@ -44,8 +44,14 @@
       "dest": "/api/main.py"
     },
     {
+      "src": "/index.html",
+      "headers": {
+        "cache-control": "public, max-age=3600, must-revalidate"
+      }
+    },
+    {
       "src": "/(.*)",
-      "dest": "/public/index.html"
+      "dest": "/index.html"
     }
   ],
   "env": {
