@@ -1,0 +1,65 @@
+version: '3.8'
+
+services:
+  # Backend API (development mode)
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - API_URL=http://localhost:8000
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_KEY=${SUPABASE_KEY}
+    volumes:
+      - .:/app
+    command: uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
+
+  # Log Watcher Agent
+  log-watcher:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      - api
+    environment:
+      - API_URL=http://api:8000
+      - LOG_FILE=/var/log/syslog
+      - POLL_INTERVAL=10
+      - BATCH_SIZE=100
+    volumes:
+      - /var/log:/var/log:ro
+    command: python agent/log_watcher_enhanced.py
+    restart: unless-stopped
+
+  # Metrics Collector Agent
+  metrics-collector:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      - api
+    environment:
+      - API_URL=http://api:8000
+      - POLL_INTERVAL=30
+    command: python agent/metrics_collector_enhanced.py
+    restart: unless-stopped
+
+  # Anomaly Detector Agent
+  anomaly-detector:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      - api
+    environment:
+      - API_URL=http://api:8000
+      - POLL_INTERVAL=60
+      - ANOMALY_THRESHOLD=5
+    command: python agent/anomaly_detector_enhanced.py
+    restart: unless-stopped
+
+volumes:
+  logs:

@@ -5,10 +5,16 @@ This file is the entry point for Vercel's serverless functions
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, HTMLResponse
-from fastapi.routing import APIRoute
 import os
 from datetime import datetime
-from typing import List
+from typing import Optional
+
+# Import database manager
+try:
+    from .database import db
+    DB_AVAILABLE = True
+except ImportError:
+    DB_AVAILABLE = False
 
 # Create FastAPI app
 app = FastAPI(
@@ -26,39 +32,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Mock data
-logs_db = [
+# Fallback demo data (for when database is not available)
+demo_logs = [
     {"message": "Application started successfully", "level": "INFO", "timestamp": datetime.now().isoformat()},
     {"message": "Database connection established", "level": "INFO", "timestamp": datetime.now().isoformat()},
     {"message": "Cache initialized with 1000 entries", "level": "INFO", "timestamp": datetime.now().isoformat()},
     {"message": "Warning: High memory usage detected", "level": "WARN", "timestamp": datetime.now().isoformat()},
     {"message": "Error: Connection timeout to external service", "level": "ERROR", "timestamp": datetime.now().isoformat()},
 ]
-metrics_db = [
-    {"cpu": 45, "memory": 62, "disk": 78, "timestamp": datetime.now().isoformat()},
-]
-alerts_db = [
-    {
-        "id": 1,
-        "title": "High CPU Usage",
-        "message": "CPU usage has exceeded 80% threshold",
-        "severity": "CRITICAL",
-        "timestamp": datetime.now().isoformat()
-    },
-    {
-        "id": 2,
-        "title": "Memory Warning",
-        "message": "Memory usage is at 75% capacity",
-        "severity": "WARNING",
-        "timestamp": datetime.now().isoformat()
-    },
-    {
-        "id": 3,
-        "title": "API Response Time",
-        "message": "Average response time is 2.5s (normal: <500ms)",
-        "severity": "INFO",
-        "timestamp": datetime.now().isoformat()
-    },
+demo_alerts = [
+    {"id": 1, "title": "High CPU Usage", "message": "CPU usage has exceeded 80% threshold", "severity": "CRITICAL", "timestamp": datetime.now().isoformat()},
+    {"id": 2, "title": "Memory Warning", "message": "Memory usage is at 75% capacity", "severity": "WARNING", "timestamp": datetime.now().isoformat()},
+    {"id": 3, "title": "API Response Time", "message": "Average response time is 2.5s (normal: <500ms)", "severity": "INFO", "timestamp": datetime.now().isoformat()},
 ]
 
 # ==================== LOGS ENDPOINTS ====================
@@ -66,24 +51,41 @@ alerts_db = [
 @app.get("/logs/search")
 async def search_logs(query: str = "", limit: int = 50, offset: int = 0):
     """Search logs"""
+    if DB_AVAILABLE:
+        result = await db.get_logs(limit=limit, offset=offset, query=query)
+        return {
+            "query": query,
+            "limit": limit,
+            "offset": offset,
+            "results": result.get("results", []),
+            "total": result.get("total", 0),
+            "timestamp": datetime.now().isoformat()
+        }
+    
+    # Fallback to demo data
+    filtered = demo_logs
+    if query:
+        filtered = [l for l in demo_logs if query.lower() in l["message"].lower()]
     return {
         "query": query,
         "limit": limit,
         "offset": offset,
-        "results": logs_db[offset:offset+limit],
-        "total": len(logs_db),
+        "results": filtered[offset:offset+limit],
+        "total": len(filtered),
         "timestamp": datetime.now().isoformat()
     }
 
 @app.get("/logs/stats")
 async def log_stats():
     """Get log statistics"""
-    error_count = len([l for l in logs_db if l.get("level") == "ERROR"])
-    warn_count = len([l for l in logs_db if l.get("level") == "WARN"])
-    info_count = len([l for l in logs_db if l.get("level") == "INFO"])
+    if DB_AVAILABLE:
+        return await db.get_log_stats()
+    error_count = len([l for l in demo_logs if l.get("level") == "ERROR"])
+    warn_count = len([l for l in demo_logs if l.get("level") == "WARN"])
+    info_count = len([l for l in demo_logs if l.get("level") == "INFO"])
     
     return {
-        "total_logs": len(logs_db),
+        "total_logs": len(demo_logs),
         "by_level": {
             "ERROR": error_count,
             "WARN": warn_count,
@@ -93,70 +95,102 @@ async def log_stats():
     }
 
 @app.post("/logs/ingest")
-async def ingest_log(log_entry: dict):
-    """Ingest a log entry"""
-    log_entry["timestamp"] = datetime.now().isoformat()
-    logs_db.append(log_entry)
-    return {"status": "success", "id": len(logs_db)}
+async def ingest_log(message: str, level: str = "INFO", source: str = "unknown"):
+    """Ingest a log entry from agents"""
+    if DB_AVAILABLE:
+        result = await db.add_log(message=message, level=level, source=source)
+        return result
+    
+    # Fallback: store in demo data
+    log_entry = {
+        "message": message,
+        "level": level,
+        "source": source,
+        "timestamp": datetime.now().isoformat()
+    }
+    demo_logs.append(log_entry)
+    return {"status": "success", "id": len(demo_logs)}
 
 # ==================== METRICS ENDPOINTS ====================
 
 @app.get("/metrics")
 async def get_metrics():
-    """Get system metrics"""
+    """Get current system metrics"""
     return {
-        "cpu_usage": 0,
-        "memory_usage": 0,
-        "disk_usage": 0,
+        "cpu_usage": 45,
+        "memory_usage": 62,
+        "disk_usage": 78,
         "timestamp": datetime.now().isoformat()
     }
 
 @app.get("/metrics/history")
 async def metrics_history(hours: int = 24):
     """Get metrics history"""
+    if DB_AVAILABLE:
+        return await db.get_metrics(hours=hours)
+    
     return {
         "hours": hours,
-        "data": metrics_db[-100:],
-        "total": len(metrics_db)
+        "data": [{"cpu": 45, "memory": 62, "disk": 78, "timestamp": datetime.now().isoformat()}],
+        "total": 1
     }
 
 @app.post("/metrics/record")
-async def record_metric(metric: dict):
-    """Record a metric"""
-    metric["timestamp"] = datetime.now().isoformat()
-    metrics_db.append(metric)
+async def record_metric(name: str, value: float, tags: dict = None):
+    """Record a metric from agents"""
+    if DB_AVAILABLE:
+        return await db.record_metric(name=name, value=value, tags=tags)
+    
     return {"status": "success"}
 
 # ==================== ALERTS ENDPOINTS ====================
 
 @app.get("/alerts")
-async def get_alerts(severity: str = None):
-    """Get alerts"""
-    filtered = alerts_db
+async def get_alerts(severity: Optional[str] = None):
+    """Get active alerts"""
+    if DB_AVAILABLE:
+        return await db.get_alerts(severity=severity)
+    
+    # Fallback to demo data
+    filtered = demo_alerts
     if severity:
-        filtered = [a for a in alerts_db if a.get("severity") == severity]
+        filtered = [a for a in demo_alerts if a.get("severity") == severity]
     
     return {
         "alerts": filtered,
-        "critical": len([a for a in alerts_db if a.get("severity") == "CRITICAL"]),
-        "warning": len([a for a in alerts_db if a.get("severity") == "WARNING"]),
-        "info": len([a for a in alerts_db if a.get("severity") == "INFO"]),
+        "critical": len([a for a in demo_alerts if a.get("severity") == "CRITICAL"]),
+        "warning": len([a for a in demo_alerts if a.get("severity") == "WARNING"]),
+        "info": len([a for a in demo_alerts if a.get("severity") == "INFO"]),
         "timestamp": datetime.now().isoformat()
     }
 
 @app.post("/alerts")
-async def create_alert(alert: dict):
-    """Create an alert"""
-    alert["id"] = len(alerts_db) + 1
-    alert["timestamp"] = datetime.now().isoformat()
-    alerts_db.append(alert)
+async def create_alert(title: str, message: str, severity: str = "INFO"):
+    """Create an alert from agents"""
+    if DB_AVAILABLE:
+        result = await db.add_alert(title=title, message=message, severity=severity)
+        return result
+    
+    # Fallback: store in demo data
+    alert = {
+        "id": len(demo_alerts) + 1,
+        "title": title,
+        "message": message,
+        "severity": severity,
+        "timestamp": datetime.now().isoformat()
+    }
+    demo_alerts.append(alert)
     return {"status": "success", "alert_id": alert["id"]}
 
 @app.delete("/alerts/{alert_id}")
 async def dismiss_alert(alert_id: int):
     """Dismiss an alert"""
-    global alerts_db
-    alerts_db = [a for a in alerts_db if a.get("id") != alert_id]
+    if DB_AVAILABLE:
+        return await db.resolve_alert(alert_id)
+    
+    # Fallback: remove from demo data
+    global demo_alerts
+    demo_alerts = [a for a in demo_alerts if a.get("id") != alert_id]
     return {"status": "success", "dismissed_id": alert_id}
 
 # ==================== UTILITY ENDPOINTS ====================
