@@ -27,9 +27,39 @@ app.add_middleware(
 )
 
 # Mock data
-logs_db = []
-metrics_db = []
-alerts_db = []
+logs_db = [
+    {"message": "Application started successfully", "level": "INFO", "timestamp": datetime.now().isoformat()},
+    {"message": "Database connection established", "level": "INFO", "timestamp": datetime.now().isoformat()},
+    {"message": "Cache initialized with 1000 entries", "level": "INFO", "timestamp": datetime.now().isoformat()},
+    {"message": "Warning: High memory usage detected", "level": "WARN", "timestamp": datetime.now().isoformat()},
+    {"message": "Error: Connection timeout to external service", "level": "ERROR", "timestamp": datetime.now().isoformat()},
+]
+metrics_db = [
+    {"cpu": 45, "memory": 62, "disk": 78, "timestamp": datetime.now().isoformat()},
+]
+alerts_db = [
+    {
+        "id": 1,
+        "title": "High CPU Usage",
+        "message": "CPU usage has exceeded 80% threshold",
+        "severity": "CRITICAL",
+        "timestamp": datetime.now().isoformat()
+    },
+    {
+        "id": 2,
+        "title": "Memory Warning",
+        "message": "Memory usage is at 75% capacity",
+        "severity": "WARNING",
+        "timestamp": datetime.now().isoformat()
+    },
+    {
+        "id": 3,
+        "title": "API Response Time",
+        "message": "Average response time is 2.5s (normal: <500ms)",
+        "severity": "INFO",
+        "timestamp": datetime.now().isoformat()
+    },
+]
 
 # ==================== LOGS ENDPOINTS ====================
 
@@ -48,12 +78,16 @@ async def search_logs(query: str = "", limit: int = 50, offset: int = 0):
 @app.get("/logs/stats")
 async def log_stats():
     """Get log statistics"""
+    error_count = len([l for l in logs_db if l.get("level") == "ERROR"])
+    warn_count = len([l for l in logs_db if l.get("level") == "WARN"])
+    info_count = len([l for l in logs_db if l.get("level") == "INFO"])
+    
     return {
         "total_logs": len(logs_db),
         "by_level": {
-            "ERROR": 0,
-            "WARN": 0,
-            "INFO": 0,
+            "ERROR": error_count,
+            "WARN": warn_count,
+            "INFO": info_count,
             "DEBUG": 0
         }
     }

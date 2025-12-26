@@ -1,0 +1,16 @@
+{
+  "name": "Distributed Log Analytics Platform",
+  "short_name": "Log Analytics",
+  "description": "Real-time distributed log aggregation and anomaly detection platform",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#667eea",
+  "theme_color": "#667eea",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
