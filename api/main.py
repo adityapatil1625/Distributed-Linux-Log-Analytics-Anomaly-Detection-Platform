@@ -33,7 +33,7 @@ alerts_db = []
 
 # ==================== LOGS ENDPOINTS ====================
 
-@app.get("/api/logs/search")
+@app.get("/logs/search")
 async def search_logs(query: str = "", limit: int = 50, offset: int = 0):
     """Search logs"""
     return {
@@ -45,7 +45,7 @@ async def search_logs(query: str = "", limit: int = 50, offset: int = 0):
         "timestamp": datetime.now().isoformat()
     }
 
-@app.get("/api/logs/stats")
+@app.get("/logs/stats")
 async def log_stats():
     """Get log statistics"""
     return {
@@ -58,7 +58,7 @@ async def log_stats():
         }
     }
 
-@app.post("/api/logs/ingest")
+@app.post("/logs/ingest")
 async def ingest_log(log_entry: dict):
     """Ingest a log entry"""
     log_entry["timestamp"] = datetime.now().isoformat()
@@ -67,7 +67,7 @@ async def ingest_log(log_entry: dict):
 
 # ==================== METRICS ENDPOINTS ====================
 
-@app.get("/api/metrics")
+@app.get("/metrics")
 async def get_metrics():
     """Get system metrics"""
     return {
@@ -77,7 +77,7 @@ async def get_metrics():
         "timestamp": datetime.now().isoformat()
     }
 
-@app.get("/api/metrics/history")
+@app.get("/metrics/history")
 async def metrics_history(hours: int = 24):
     """Get metrics history"""
     return {
@@ -86,7 +86,7 @@ async def metrics_history(hours: int = 24):
         "total": len(metrics_db)
     }
 
-@app.post("/api/metrics/record")
+@app.post("/metrics/record")
 async def record_metric(metric: dict):
     """Record a metric"""
     metric["timestamp"] = datetime.now().isoformat()
@@ -95,7 +95,7 @@ async def record_metric(metric: dict):
 
 # ==================== ALERTS ENDPOINTS ====================
 
-@app.get("/api/alerts")
+@app.get("/alerts")
 async def get_alerts(severity: str = None):
     """Get alerts"""
     filtered = alerts_db
@@ -110,7 +110,7 @@ async def get_alerts(severity: str = None):
         "timestamp": datetime.now().isoformat()
     }
 
-@app.post("/api/alerts")
+@app.post("/alerts")
 async def create_alert(alert: dict):
     """Create an alert"""
     alert["id"] = len(alerts_db) + 1
@@ -118,7 +118,7 @@ async def create_alert(alert: dict):
     alerts_db.append(alert)
     return {"status": "success", "alert_id": alert["id"]}
 
-@app.delete("/api/alerts/{alert_id}")
+@app.delete("/alerts/{alert_id}")
 async def dismiss_alert(alert_id: int):
     """Dismiss an alert"""
     global alerts_db
@@ -154,23 +154,23 @@ async def api_info():
         "name": "Distributed Log Analytics Platform",
         "version": "0.1.0",
         "environment": os.getenv("VERCEL_ENV", "development"),
-        "docs": "/api/docs",
-        "openapi": "/api/openapi.json",
+        "docs": "/docs",
+        "openapi": "/openapi.json",
         "endpoints": {
             "logs": {
-                "search": "GET /api/logs/search",
-                "stats": "GET /api/logs/stats",
-                "ingest": "POST /api/logs/ingest"
+                "search": "GET /logs/search",
+                "stats": "GET /logs/stats",
+                "ingest": "POST /logs/ingest"
             },
             "metrics": {
-                "current": "GET /api/metrics",
-                "history": "GET /api/metrics/history",
-                "record": "POST /api/metrics/record"
+                "current": "GET /metrics",
+                "history": "GET /metrics/history",
+                "record": "POST /metrics/record"
             },
             "alerts": {
-                "list": "GET /api/alerts",
-                "create": "POST /api/alerts",
-                "dismiss": "DELETE /api/alerts/{id}"
+                "list": "GET /alerts",
+                "create": "POST /alerts",
+                "dismiss": "DELETE /alerts/{id}"
             }
         }
     }
